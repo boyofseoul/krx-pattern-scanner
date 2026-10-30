@@ -34,7 +34,6 @@ def get_filtered_candidates():
     print("📊 KRX 전종목 리스트 수집 중...")
     df_krx = fdr.StockListing('KRX')
     
-    # 컬럼명 호환성 처리 및 시총 3,000억 이상 필터링
     marcap_col = 'Marcap' if 'Marcap' in df_krx.columns else 'MarketCap'
     df_mid_large = df_krx[
         (df_krx[marcap_col] >= 300_000_000_000) &
@@ -47,7 +46,6 @@ def get_filtered_candidates():
     else:
         df_mid_large = df_mid_large.sort_values(by=marcap_col, ascending=False).head(70)
 
-    # 외인/기관 수급 데이터 조회 (해외 IP 차단 대비 안전장치 포함)
     try:
         df_inv_kospi = stock.get_market_net_purchases_of_equities_by_ticker(target_date, target_date, "KOSPI")
         df_inv_kosdaq = stock.get_market_net_purchases_of_equities_by_ticker(target_date, target_date, "KOSDAQ")
@@ -79,7 +77,6 @@ def get_filtered_candidates():
             max_vol_ratio = round(float(recent_5d['Vol_Ratio_Pct'].max()), 1)
             latest = ohlcv.iloc[-1]
 
-            # 수급 확인
             is_dual_buy = False
             supply_status = f"거래량 {int(max_vol_ratio)}% 급증"
             if not df_inv.empty and code in df_inv.index:
@@ -103,10 +100,8 @@ def get_filtered_candidates():
                 "recent_10d_closes": [int(x) for x in ohlcv['Close'].tail(10).tolist()]
             }
 
-            # 1순위: 양매수 + 거래량 200% 이상
             if is_dual_buy and max_vol_ratio >= 200.0:
                 strict_candidates.append(item)
-            # 2순위(백업): 거래량 150% 이상 또는 양매수
             elif is_dual_buy or max_vol_ratio >= 150.0:
                 candidates.append(item)
 
@@ -151,12 +146,23 @@ def analyze_with_gemini(candidates):
       }}
     ]
     """
-    response = client.models.generate_content(
-        model="gemini-3.0-flash",
-        contents=prompt,
-        config={"response_mime_type": "application/json"}
-    )
-    return json.loads(response.text)
+    # 최신 모델 gemini-3.0-flash를 1순위로 호출
+    for model_name in ["gemini-3.0-flash", "gemini-3.0-pro", "gemini-2.5-pro"]:
+        try:
+            print(f"🤖 {model_name} 모델로 분석 요청 중...")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
+            raw_text = response.text.strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            return json.loads(raw_text)
+        except Exception as e:
+            print(f"⚠️ {model_name} 호출 실패, 다음 모델 시도: {e}")
+            continue
+    raise RuntimeError("Gemini 모델 호출에 모두 실패했습니다.")
 
 if __name__ == "__main__":
     filtered = get_filtered_candidates()
