@@ -2,14 +2,16 @@ name: Daily KRX Pattern Scanner
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5' # 평일 KST 21:00 (UTC 12:00)
-  workflow_dispatch:       # 수동 즉시 실행 버튼 활성화
+    - cron: '0 12 * * 1-5' # 평일 KST 21:00
+  workflow_dispatch:
 
 jobs:
   analyze_and_deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TZ: Asia/Seoul # 서버 시간을 한국 시간(KST)으로 고정
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
@@ -19,8 +21,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 필수 패키지 설치 (pykrx 포함)
-        run: pip install finance-datareader pykrx pandas google-genai
+      - name: 필수 패키지 설치
+        run: pip install --upgrade pip && pip install finance-datareader pykrx pandas lxml beautifulsoup4 requests matplotlib google-genai
 
       - name: 장마감 데이터 수집 및 Gemini 분석 실행
         env:
