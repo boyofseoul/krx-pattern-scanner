@@ -152,7 +152,7 @@ def analyze_with_gemini(candidates):
     ]
     """
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.0-flash",
         contents=prompt,
         config={"response_mime_type": "application/json"}
     )
