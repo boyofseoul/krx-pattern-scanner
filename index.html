@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#090a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>KRX 6대 급등 패턴 AI 스캐너 Pro</title>
+
+  <!-- 모바일 PWA 인라인 매니페스트 -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"KRX 패턴 스캐너 Pro","short_name":"패턴스캐너","start_url":".","display":"standalone","background_color":"#090a0f","theme_color":"#090a0f","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/3310/3310624.png","sizes":"512x512","type":"image/png"}]}' />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #090a0f;
+      color: #e2e8f0;
+    }
+    .obsidian-card {
+      background: linear-gradient(145deg, #11131c 0%, #0c0e14 100%);
+      border: 1px solid #1e2230;
+    }
+    .obsidian-card-active {
+      background: linear-gradient(145deg, #161926 0%, #10131d 100%);
+      border: 1px solid #6366f1;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+    }
+    /* 한국형 캔들 컬러: 양봉(상승) 레드, 음봉(하락) 블루 */
+    .krx-up { color: #f43f5e; }
+    .krx-down { color: #3b82f6; }
+    .bg-krx-up { background-color: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.3); }
+    .bg-krx-down { background-color: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090a0f; }
+    ::-webkit-scrollbar-thumb { background: #262936; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen pb-16 selection:bg-indigo-500 selection:text-white">
+
+  <!-- 상단 고정 헤더 -->
+  <header class="sticky top-0 z-30 backdrop-blur-md bg-[#090a0f]/85 border-b border-[#1e2230] px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+          <i data-lucide="radar" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base md:text-lg font-bold tracking-tight text-white">KRX 6대 패턴 AI 스캐너</h1>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">중기 추세형</span>
+          </div>
+          <p id="updateTimeBadge" class="text-xs text-slate-400">장마감 데이터 동기화 중...</p>
+        </div>
+      </div>
+
+      <!-- 핵심 필터 요약 배지 & 새로고침 -->
+      <div class="flex items-center gap-2">
+        <div class="hidden lg:flex items-center gap-1.5 text-xs text-slate-300 bg-[#131620] px-3 py-1.5 rounded-lg border border-[#222634]">
+          <span class="text-indigo-400 font-semibold">필터:</span>
+          <span>시총 3,000억↑</span> ·
+          <span class="text-rose-400">외인/기관 양매수</span> ·
+          <span class="text-amber-400">거래량 200%↑</span>
+        </div>
+        <button onclick="loadDailyPicks(true)" class="flex items-center gap-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>21:00 데이터 로드</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 pt-5 space-y-6">
+
+    <!-- 섹션 1: 오늘의 AI 포착 6대 패턴 추천주 그리드 -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+          오늘의 6대 패턴 AI 탑픽 (보유 호흡 2~4주)
+        </h2>
+        <span id="dataSourceStatus" class="text-xs text-slate-400"></span>
+      </div>
+      <div id="stockCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <!-- JS로 6개 패턴 종목 카드가 렌더링됩니다 -->
+      </div>
+    </section>
+
+    <!-- 섹션 2: 인터랙티브 캔들 차트 & 타점 시뮬레이터 -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      
+      <!-- 좌측 2칸: 캔들스틱 & 거래량 차트 -->
+      <div class="lg:col-span-2 obsidian-card rounded-2xl p-4 md:p-5 flex flex-col justify-between">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[#1e2230] pb-3.5 mb-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span id="chartPatternBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">N자형 눌림목</span>
+              <h3 id="chartStockTitle" class="text-lg font-bold text-white">종목 선택 대기</h3>
+              <span id="chartStockCode" class="text-xs text-slate-400 font-mono"></span>
+            </div>
+            <p id="chartAiComment" class="text-xs text-slate-300 mt-1.5 leading-relaxed"></p>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="flex items-center gap-1.5 cursor-pointer bg-[#151824] px-2.5 py-1.5 rounded-lg border border-[#252a3d]">
+              <input type="checkbox" id="toggleGuideLines" checked onchange="drawChart()" class="accent-indigo-500" />
+              <span>타점 가이드선 표시</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 캔버스 영역 -->
+        <div class="relative w-full h-[320px] md:h-[360px] bg-[#090b10] rounded-xl border border-[#191d2b] overflow-hidden">
+          <canvas id="candleCanvas" class="w-full h-full block"></canvas>
+        </div>
+
+        <!-- 하단 수급 & 기술적 요약 바 -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3.5 pt-3 border-t border-[#1e2230] text-xs">
+          <div class="bg-[#121520] p-2.5 rounded-lg border border-[#1d2233]">
+            <span class="text-slate-400 block">20일 대비 거래량</span>
+            <strong id="metricVolRatio" class="text-amber-400 text-sm font-bold mt-0.5 block">-</strong>
+          </div>
+          <div class="bg-[#121520] p-2.5 rounded-lg border border-[#1d2233]">
+            <span class="text-slate-400 block">외인·기관 수급</span>
+            <strong id="metricInstForeign" class="text-rose-400 text-sm font-bold mt-0.5 block">-</strong>
+          </div>
+          <div class="bg-[#121520] p-2.5 rounded-lg border border-[#1d2233]">
+            <span class="text-slate-400 block">권장 매수타점</span>
+            <strong id="metricEntry" class="text-white text-sm font-bold mt-0.5 block">-</strong>
+          </div>
+          <div class="bg-[#121520] p-2.5 rounded-lg border border-[#1d2233]">
+            <span class="text-slate-400 block">목표가 / 손절선</span>
+            <strong id="metricTargetStop" class="text-emerald-400 text-sm font-bold mt-0.5 block">-</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 우측 1칸: 중기 스윙 포지션 & R:R 계산기 -->
+      <div class="obsidian-card rounded-2xl p-4 md:p-5 flex flex-col justify-between space-y-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2 border-b border-[#1e2230] pb-3">
+            <i data-lucide="calculator" class="w-4 h-4 text-indigo-400"></i>
+            중기 추세 손익비(R:R) & 비중 계산기
+          </h3>
+          <p class="text-xs text-slate-400 mt-2">
+            선택한 종목의 타점이 자동 입력됩니다. (기준: 목표 +15~25% / 손절 -5~7%)
+          </p>
+
+          <div class="space-y-3 mt-4 text-xs">
+            <div>
+              <label class="block text-slate-300 mb-1">종목 투입 예정 금액 (원)</label>
+              <input type="number" id="calcCapital" value="10000000" step="1000000" oninput="updateCalculator()"
+                class="w-full bg-[#0b0d14] border border-[#262b3d] rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-indigo-500 focus:outline-none" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-slate-400 mb-1">진입가 (원)</label>
+                <input type="number" id="calcEntry" value="0" oninput="updateCalculator()"
+                  class="w-full bg-[#0b0d14] border border-[#262b3d] rounded-lg px-2.5 py-2 text-white font-mono focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-rose-400 mb-1">목표가 (+15~25%)</label>
+                <input type="number" id="calcTarget" value="0" oninput="updateCalculator()"
+                  class="w-full bg-[#0b0d14] border border-rose-500/40 rounded-lg px-2.5 py-2 text-rose-300 font-mono focus:border-rose-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-blue-400 mb-1">손절가 (-5~7%)</label>
+                <input type="number" id="calcStop" value="0" oninput="updateCalculator()"
+                  class="w-full bg-[#0b0d14] border border-blue-500/40 rounded-lg px-2.5 py-2 text-blue-300 font-mono focus:border-blue-500 focus:outline-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 계산 결과 박스 -->
+        <div class="bg-[#0b0d14] rounded-xl p-3.5 border border-[#1f2436] space-y-2.5 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">기대 손익비 (Reward : Risk)</span>
+            <span id="resRR" class="text-base font-extrabold text-indigo-400">1 : 3.2</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">권장 매수 수량</span>
+            <span id="resQty" class="font-mono font-bold text-white">0주</span>
+          </div>
+          <div class="flex justify-between items-center border-t border-[#191d2b] pt-2">
+            <span class="text-slate-400">목표 도달 시 기대수익</span>
+            <span id="resProfit" class="font-mono font-bold krx-up">+0원 (0%)</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">손절 이탈 시 예상손실</span>
+            <span id="resLoss" class="font-mono font-bold krx-down">-0원 (0%)</span>
+          </div>
+        </div>
+
+        <!-- 5대 핵심 체크리스트 -->
+        <div class="border-t border-[#1e2230] pt-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-semibold text-slate-300">중대형주 스윙 진입 체크</span>
+            <span id="checkScoreBadge" class="text-xs font-bold text-emerald-400">100점</span>
+          </div>
+          <div class="space-y-1.5 text-xs text-slate-300">
+            <label class="flex items-center gap-2"><input type="checkbox" checked onchange="updateCheckScore()" class="chk-item accent-indigo-500"/> 시총 3,000억 이상 & 일 거래대금 300억↑</label>
+            <label class="flex items-center gap-2"><input type="checkbox" checked onchange="updateCheckScore()" class="chk-item accent-indigo-500"/> 외국인·기관 동시 순매수 (양매수 유입)</label>
+            <label class="flex items-center gap-2"><input type="checkbox" checked onchange="updateCheckScore()" class="chk-item accent-indigo-500"/> 기준봉 거래량 20일 평균 대비 200%↑</label>
+            <label class="flex items-center gap-2"><input type="checkbox" checked onchange="updateCheckScore()" class="chk-item accent-indigo-500"/> 손익비(R:R) 2.5 이상 (목표 +18% / 손절 -6%)</label>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    // 기본 내장 데이터 (daily_picks.json이 아직 없거나 로컬 열람 시 작동하는 시총 3,000억+ 양매수 샘플)
+    const FALLBACK_DATA = {
+      updated_at: "2026-10-29 21:00 KST (샘플 프리뷰 모드)",
+      recommendations: [
+        {
+          pattern_id: "bull_flag",
+          pattern_name: "N자형 눌림목",
+          code: "000660",
+          name: "SK하이닉스",
+          market: "KOSPI",
+          marcap_billion: 1420000,
+          current_price: 196500,
+          entry_price: 195000,
+          target_price: 234000,
+          stop_price: 183300,
+          rr_ratio: 3.3,
+          vol_ratio_20d: 245,
+          supply_badge: "외인+기관 3일 연속 양매수",
+          score: 94,
+          ai_comment: "대량 거래량(245%) 수반 장대양봉 이후 거래량이 급감하며 10일선 지지 확인. 외인·기관 양매수 유입으로 중기 전고점 돌파 기대."
+        },
+        {
+          pattern_id: "rounded_bottom",
+          pattern_name: "밥그릇 3번 자리",
+          code: "042700",
+          name: "한미반도체",
+          market: "KOSPI",
+          marcap_billion: 115000,
+          current_price: 118500,
+          entry_price: 117000,
+          target_price: 142000,
+          stop_price: 109500,
+          rr_ratio: 3.3,
+          vol_ratio_20d: 280,
+          supply_badge: "외인+기관 동시 순매수 전환",
+          score: 91,
+          ai_comment: "장기 바닥권 매집 이후 60일 이동평균선을 거래량 280% 폭발과 함께 강하게 돌파 후 안착하는 전형적인 밥그릇 3번 초입 구간."
+        },
+        {
+          pattern_id: "box_breakout",
+          pattern_name: "박스권 매물 돌파",
+          code: "267260",
+          name: "HD현대일렉트릭",
+          market: "KOSPI",
+          marcap_billion: 128000,
+          current_price: 356000,
+          entry_price: 352000,
+          target_price: 422000,
+          stop_price: 330000,
+          rr_ratio: 3.2,
+          vol_ratio_20d: 310,
+          supply_badge: "기관 투신/연기금 강력 매집",
+          score: 96,
+          ai_comment: "2개월간 이어진 상단 박스권 매물대를 거래량 310% 급증 및 양매수로 돌파 완료. 2~4주 중기 추세 추종에 최적화된 구간."
+        },
+        {
+          pattern_id: "inv_hs",
+          pattern_name: "역헤드앤숄더",
+          code: "196170",
+          name: "알테오젠",
+          market: "KOSDAQ",
+          marcap_billion: 185000,
+          current_price: 348000,
+          entry_price: 345000,
+          target_price: 410000,
+          stop_price: 324000,
+          rr_ratio: 3.1,
+          vol_ratio_20d: 215,
+          supply_badge: "외인+기관 쌍끌이 유입",
+          score: 89,
+          ai_comment: "우측 어깨 저점을 높인 뒤 넥라인 저항을 기관·외인 동시 순매수로 돌파. 하락 추세를 완전히 마감하는 중기 변곡점."
+        },
+        {
+          pattern_id: "asc_triangle",
+          pattern_name: "상승 삼각수렴",
+          code: "012450",
+          name: "한화에어로스페이스",
+          market: "KOSPI",
+          marcap_billion: 164000,
+          current_price: 362000,
+          entry_price: 358000,
+          target_price: 430000,
+          stop_price: 336000,
+          rr_ratio: 3.3,
+          vol_ratio_20d: 225,
+          supply_badge: "외인·연기금 동반 순매수",
+          score: 92,
+          ai_comment: "고점 저항은 일정하나 저점이 꾸준히 높아지는 수렴 끝단에서 거래량 225% 증가와 함께 상방 발산 시작."
+        },
+        {
+          pattern_id: "ma_squeeze",
+          pattern_name: "이평선 밀집 골든크로스",
+          code: "145020",
+          name: "휴젤",
+          market: "KOSDAQ",
+          marcap_billion: 38000,
+          current_price: 274000,
+          entry_price: 272000,
+          target_price: 325000,
+          stop_price: 255000,
+          rr_ratio: 3.1,
+          vol_ratio_20d: 260,
+          supply_badge: "외인+기관 4일 연속 양매수",
+          score: 90,
+          ai_comment: "5일·20일·60일 이동평균선 이격도가 2% 이내로 응축된 후 거래량 폭발과 함께 정배열 확산 초입 진입."
+        }
+      ]
+    };
+
+    let currentPicks = [];
+    let selectedStock = null;
+
+    async function loadDailyPicks(showToast = false) {
+      const statusEl = document.getElementById('dataSourceStatus');
+      try {
+        const res = await fetch('./daily_picks.json?t=' + Date.now());
+        if (!res.ok) throw new Error('No local JSON');
+        const data = await res.json();
+        document.getElementById('updateTimeBadge').textContent = `최근 AI 분석: ${data.updated_at}`;
+        statusEl.textContent = "실시간 daily_picks.json 연동됨";
+        statusEl.className = "text-xs text-emerald-400 font-medium";
+        currentPicks = data.recommendations;
+      } catch (e) {
+        document.getElementById('updateTimeBadge').textContent = `기준 시각: ${FALLBACK_DATA.updated_at}`;
+        statusEl.textContent = "프리뷰 모드 (GitHub 배포 시 daily_picks.json 자동 연결)";
+        statusEl.className = "text-xs text-amber-400";
+        currentPicks = FALLBACK_DATA.recommendations;
+      }
+      renderStockGrid();
+      if (currentPicks.length > 0) selectStock(0);
+    }
+
+    function renderStockGrid() {
+      const grid = document.getElementById('stockCardsGrid');
+      grid.innerHTML = currentPicks.map((item, idx) => {
+        const targetPct = (((item.target_price - item.entry_price) / item.entry_price) * 100).toFixed(1);
+        const stopPct = (((item.stop_price - item.entry_price) / item.entry_price) * 100).toFixed(1);
+        const isSelected = selectedStock && selectedStock.code === item.code;
+        return `
+          <div onclick="selectStock(${idx})" class="${isSelected ? 'obsidian-card-active' : 'obsidian-card'} rounded-xl p-4 cursor-pointer transition hover:border-indigo-500/60 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${item.pattern_name}</span>
+                <span class="text-xs font-extrabold text-emerald-400">적합도 ${item.score}점</span>
+              </div>
+              <div class="flex items-baseline justify-between mt-1">
+                <div>
+                  <h4 class="text-base font-bold text-white inline">${item.name}</h4>
+                  <span class="text-xs text-slate-400 font-mono ml-1">${item.code} · ${item.market}</span>
+                </div>
+                <span class="text-sm font-mono font-bold text-white">${item.current_price.toLocaleString()}원</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-2 line-clamp-2 leading-relaxed">${item.ai_comment}</p>
+            </div>
+
+            <div class="mt-3 pt-2.5 border-t border-[#1e2230] flex items-center justify-between text-[11px]">
+              <span class="text-rose-400 font-medium">${item.supply_badge || '외인·기관 양매수'}</span>
+              <div class="font-mono">
+                <span class="krx-up font-bold">목표 +${targetPct}%</span>
+                <span class="text-slate-600 mx-1">/</span>
+                <span class="krx-down font-bold">손절 ${stopPct}%</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectStock(index) {
+      selectedStock = currentPicks[index];
+      renderStockGrid();
+
+      document.getElementById('chartPatternBadge').textContent = selectedStock.pattern_name;
+      document.getElementById('chartStockTitle').textContent = selectedStock.name;
+      document.getElementById('chartStockCode').textContent = `(${selectedStock.code} · ${selectedStock.market})`;
+      document.getElementById('chartAiComment').textContent = selectedStock.ai_comment;
+
+      document.getElementById('metricVolRatio').textContent = `${selectedStock.vol_ratio_20d}% 폭발`;
+      document.getElementById('metricInstForeign').textContent = selectedStock.supply_badge || "외인·기관 동시 순매수";
+      document.getElementById('metricEntry').textContent = `${selectedStock.entry_price.toLocaleString()}원`;
+      document.getElementById('metricTargetStop').textContent = `${selectedStock.target_price.toLocaleString()} / ${selectedStock.stop_price.toLocaleString()}`;
+
+      // 계산기 연동
+      document.getElementById('calcEntry').value = selectedStock.entry_price;
+      document.getElementById('calcTarget').value = selectedStock.target_price;
+      document.getElementById('calcStop').value = selectedStock.stop_price;
+      updateCalculator();
+      drawChart();
+    }
+
+    // 선택된 패턴에 맞는 30봉 시뮬레이션 또는 실제 캔들 렌더링
+    function generatePatternCandles(stock) {
+      const base = stock.entry_price;
+      const candles = [];
+      let price = base * 0.92;
+      for (let i = 0; i < 28; i++) {
+        let change = (Math.random() - 0.46) * (base * 0.022);
+        if (stock.pattern_id === 'bull_flag' && i > 18 && i < 25) change = -Math.abs(change) * 0.5;
+        if (i >= 25) change = Math.abs(change) * 1.4;
+        const open = price;
+        const close = Math.round(open + change);
+        const high = Math.round(Math.max(open, close) + Math.random() * (base * 0.012));
+        const low = Math.round(Math.min(open, close) - Math.random() * (base * 0.012));
+        const vol = i >= 25 ? Math.round(100 + Math.random() * 180) : Math.round(30 + Math.random() * 50);
+        candles.push({ open, high, low, close, vol });
+        price = close;
+      }
+      // 마지막 봉을 현재가에 맞춤
+      candles[candles.length - 1].close = stock.current_price;
+      candles[candles.length - 1].high = Math.max(candles[candles.length - 1].high, stock.current_price);
+      candles[candles.length - 1].vol = stock.vol_ratio_20d;
+      return candles;
+    }
+
+    function drawChart() {
+      if (!selectedStock) return;
+      const canvas = document.getElementById('candleCanvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width;
+      const H = rect.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const candles = selectedStock.candles || generatePatternCandles(selectedStock);
+      selectedStock.candles = candles;
+
+      const prices = candles.flatMap(c => [c.high, c.low]);
+      prices.push(selectedStock.target_price * 0.95, selectedStock.stop_price * 0.99);
+      const maxP = Math.max(...prices) * 1.02;
+      const minP = Math.min(...prices) * 0.98;
+
+      const chartH = H * 0.72;
+      const volH = H * 0.20;
+      const padL = 16, padR = 78, padT = 18;
+
+      const toY = p => padT + ((maxP - p) / (maxP - minP)) * (chartH - padT);
+      const stepX = (W - padL - padR) / candles.length;
+
+      // 그리드 라인
+      ctx.strokeStyle = '#161a28';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = padT + ((chartH - padT) / 4) * i;
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      }
+
+      // 캔들 및 거래량 그리기
+      const maxVol = Math.max(...candles.map(c => c.vol));
+      candles.forEach((c, i) => {
+        const x = padL + i * stepX + stepX / 2;
+        const isUp = c.close >= c.open;
+        const color = isUp ? '#f43f5e' : '#3b82f6';
+
+        // 심지
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, toY(c.high));
+        ctx.lineTo(x, toY(c.low));
+        ctx.stroke();
+
+        // 몸통
+        const yOpen = toY(c.open);
+        const yClose = toY(c.close);
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyH = Math.max(Math.abs(yClose - yOpen), 2.5);
+        ctx.fillStyle = color;
+        ctx.fillRect(x - stepX * 0.32, bodyTop, stepX * 0.64, bodyH);
+
+        // 하단 거래량 바
+        const vBarH = (c.vol / maxVol) * volH;
+        ctx.fillStyle = isUp ? 'rgba(244, 63, 94, 0.45)' : 'rgba(59, 130, 246, 0.45)';
+        ctx.fillRect(x - stepX * 0.32, H - vBarH - 6, stepX * 0.64, vBarH);
+      });
+
+      // 타점 가이드라인 표시
+      if (document.getElementById('toggleGuideLines').checked) {
+        const drawLine = (price, label, color) => {
+          const y = Math.max(14, Math.min(chartH - 6, toY(price)));
+          ctx.save();
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.font = 'bold 11px Pretendard, sans-serif';
+          ctx.fillText(`${label} ${price.toLocaleString()}`, W - padR + 4, y + 4);
+          ctx.restore();
+        };
+        drawLine(selectedStock.target_price, '목표', '#10b981');
+        drawLine(selectedStock.entry_price, '매수', '#f59e0b');
+        drawLine(selectedStock.stop_price, '손절', '#3b82f6');
+      }
+    }
+
+    function updateCalculator() {
+      const cap = Number(document.getElementById('calcCapital').value) || 0;
+      const entry = Number(document.getElementById('calcEntry').value) || 0;
+      const target = Number(document.getElementById('calcTarget').value) || 0;
+      const stop = Number(document.getElementById('calcStop').value) || 0;
+
+      if (entry <= 0 || target <= entry || stop >= entry) return;
+
+      const qty = Math.floor(cap / entry);
+      const rewardPerShare = target - entry;
+      const riskPerShare = entry - stop;
+      const rr = (rewardPerShare / riskPerShare).toFixed(2);
+
+      const totalProfit = qty * rewardPerShare;
+      const totalLoss = qty * riskPerShare;
+      const profitPct = ((rewardPerShare / entry) * 100).toFixed(1);
+      const lossPct = ((riskPerShare / entry) * 100).toFixed(1);
+
+      document.getElementById('resRR').textContent = `1 : ${rr}`;
+      document.getElementById('resQty').textContent = `${qty.toLocaleString()}주`;
+      document.getElementById('resProfit').textContent = `+${totalProfit.toLocaleString()}원 (+${profitPct}%)`;
+      document.getElementById('resLoss').textContent = `-${totalLoss.toLocaleString()}원 (-${lossPct}%)`;
+    }
+
+    function updateCheckScore() {
+      const checks = document.querySelectorAll('.chk-item');
+      const checkedCount = Array.from(checks).filter(c => c.checked).length;
+      const score = Math.round((checkedCount / checks.length) * 100);
+      document.getElementById('checkScoreBadge').textContent = `${score}점`;
+    }
+
+    window.addEventListener('resize', drawChart);
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadDailyPicks();
+    });
+  </script>
+</body>
+</html>
