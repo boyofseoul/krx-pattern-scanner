@@ -1,0 +1,35 @@
+name: Daily KRX Pattern Scanner
+
+on:
+  schedule:
+    - cron: '0 12 * * 1-5' # 평일 KST 21:00 (UTC 12:00)
+  workflow_dispatch:       # 수동 즉시 실행 버튼 활성화
+
+jobs:
+  analyze_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 필수 패키지 설치 (pykrx 포함)
+        run: pip install finance-datareader pykrx pandas google-genai
+
+      - name: 장마감 데이터 수집 및 Gemini 분석 실행
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python analyze_stocks.py
+
+      - name: 분석 결과(daily_picks.json) 자동 커밋 및 배포
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily_picks.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update daily picks" && git push)
